@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cricket Scorer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --bg-light: #eef5f9;
+      --hud-panel: rgba(255, 255, 255, 0.92);
+      --hud-border: #0088cc;
+      --hud-glow: rgba(0, 136, 204, 0.35);
+      --accent-cyan: #0077b6;
+      --accent-lime: #108a00;
+      --accent-amber: #d97706;
+      --accent-red: #e11d48;
+      --accent-purple: #8b5cf6;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    body {
+      background-color: var(--bg-light);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* HIGH-CONTRAST RADAR GRID & SCANLINES BACKGROUND */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: 
+        /* Circular Radar Crosshair Rings in center */
+        radial-gradient(circle at center, transparent 0, transparent 150px, rgba(0, 136, 204, 0.15) 151px, transparent 152px, transparent 300px, rgba(0, 136, 204, 0.15) 301px, transparent 302px),
+        /* Grid Lines */
+        linear-gradient(rgba(0, 119, 182, 0.22) 1.5px, transparent 1.5px),
+        linear-gradient(90deg, rgba(0, 119, 182, 0.22) 1.5px, transparent 1.5px);
+      background-size: 100% 100%, 35px 35px, 35px 35px;
+      pointer-events: none;
+      z-index: -2;
+    }
+
+    /* Moving Radar Sweep Effect */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: linear-gradient(180deg, rgba(0, 136, 204, 0) 0%, rgba(0, 136, 204, 0.12) 50%, rgba(0, 136, 204, 0) 100%);
+      background-size: 100% 100px;
+      animation: scanline 6s linear infinite;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100vh); }
+    }
+
+    .app-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .app-header h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--accent-cyan);
+      text-shadow: 0 0 10px var(--hud-glow);
+      text-transform: uppercase;
+    }
+
+    .container {
+      max-width: 880px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* HUD Glass Card */
+    .glass-card {
+      background: var(--hud-panel);
+      border: 1px solid var(--hud-border);
+      border-radius: 4px;
+      padding: 1.75rem;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 24px rgba(0, 136, 204, 0.15), inset 0 0 15px rgba(0, 136, 204, 0.05);
+      position: relative;
+    }
+
+    /* Tactical Corner Brackets */
+    .glass-card::before, .glass-card::after {
+      content: "";
+      position: absolute;
+      width: 12px; height: 12px;
+      border-color: var(--accent-cyan);
+      border-style: solid;
+      pointer-events: none;
+    }
+    .glass-card::before { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
+    .glass-card::after { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+
+    h2, h3, h4 {
+      font-family: 'Orbitron', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    label {
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    input, select {
+      padding: 0.75rem 1rem;
+      border-radius: 2px;
+      border: 1px solid var(--hud-border);
+      background: #ffffff;
+      color: var(--text-main);
+      font-size: 0.95rem;
+      outline: none;
+      box-shadow: inset 0 0 6px rgba(0, 136, 204, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent-lime);
+      box-shadow: 0 0 10px rgba(16, 138, 0, 0.3);
+    }
+
+    /* HUD Scoreboard Display */
+    .scoreboard {
+      text-align: center;
+      background: radial-gradient(circle at center, rgba(0,136,204,0.12) 0%, rgba(255,255,255,0.95) 100%);
+    }
+
+    .match-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      letter-spacing: 3px;
+    }
+
+    .badge {
+      display: inline-block;
+      margin: 0.5rem 0;
+      padding: 0.3rem 1rem;
+      border: 1px solid var(--accent-cyan);
+      background: rgba(0, 119, 182, 0.1);
+      color: var(--accent-cyan);
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .main-score {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 4.2rem;
+      font-weight: 900;
+      line-height: 1;
+      margin: 0.5rem 0;
+      color: var(--accent-cyan);
+      text-shadow: 0 0 10px rgba(0, 119, 182, 0.2);
+    }
+
+    .overs-display {
+      font-size: 1.25rem;
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .target-display {
+      margin-top: 0.75rem;
+      font-size: 1rem;
+      color: var(--accent-amber);
+      font-weight: 600;
+    }
+
+    .status-banner {
+      margin-top: 1rem;
+      padding: 0.8rem;
+      border: 1px solid var(--accent-lime);
+      background: rgba(16, 138, 0, 0.1);
+      color: var(--accent-lime);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      display: none;
+    }
+
+    /* Glass Tables */
+    .glass-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+
+    .glass-table th, .glass-table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(0, 136, 204, 0.2);
+      font-size: 0.95rem;
+    }
+
+    .glass-table th {
+      color: var(--accent-cyan);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+    }
+
+    .active-striker {
+      color: var(--accent-lime);
+      font-weight: 700;
+    }
+
+    /* Action Controls & Buttons */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+    }
+
+    .btn {
+      padding: 0.9rem 0.5rem;
+      border: 1px solid var(--hud-border);
+      border-radius: 2px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.95);
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: rgba(0, 136, 204, 0.15);
+      box-shadow: 0 0 10px var(--hud-glow);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .btn-run { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+    .btn-boundary { border-color: var(--accent-purple); color: #7c3aed; }
+    .btn-extra { border-color: var(--accent-amber); color: var(--accent-amber); }
+    .btn-wicket { border-color: var(--accent-red); color: var(--accent-red); grid-column: span 2; }
+    .btn-action { border-color: var(--accent-lime); color: var(--accent-lime); grid-column: span 2; }
+
+    /* Ball Log Badges */
+    .ball-log {
+      display: flex;
+      gap: 0.6rem;
+      overflow-x: auto;
+      padding: 0.5rem 0;
+    }
+
+    .ball-badge {
+      min-width: 40px;
+      height: 40px;
+      border: 1px solid var(--hud-border);
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .ball-W { border-color: var(--accent-red); color: var(--accent-red); background: rgba(225, 29, 72, 0.1); }
+    .ball-4, .ball-6 { border-color: var(--accent-purple); color: #7c3aed; background: rgba(139, 92, 246, 0.1); }
+
+    /* Tactical Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(238, 245, 249, 0.88);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      width: 90%;
+      max-width: 420px;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ANIMATION OVERLAYS & EFFECTS */
+    .anim-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      pointer-events: none;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .anim-ball {
+      width: 65px;
+      height: 65px;
+      background: radial-gradient(circle at 30% 30%, #ff4d4d, #990000);
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 20px rgba(225, 29, 72, 0.6);
+      position: absolute;
+    }
+
+    .anim-text {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 4.5rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      text-shadow: 0 0 20px rgba(0,0,0,0.2);
+    }
+
+    @keyframes ballRunTrajectory {
+      0% { transform: translate(-40vw, 30vh) scale(0.4); opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { transform: translate(40vw, -30vh) scale(1.2); opacity: 0; }
+    }
+
+    .anim-run-active .anim-ball {
+      animation: ballRunTrajectory 0.8s ease-out forwards;
+    }
+
+    .anim-run-active .anim-text {
+      color: var(--accent-cyan);
+      animation: textPulse 0.8s ease-out forwards;
+    }
+
+    @keyframes boundaryBurst {
+      0% { transform: scale(0.2) rotate(-10deg); opacity: 0; }
+      50% { transform: scale(1.2) rotate(3deg); opacity: 1; }
+      70% { transform: scale(1) rotate(0deg); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    @keyframes ballPop {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(2.5) translateY(-50px); opacity: 1; }
+      100% { transform: scale(0); opacity: 0; }
+    }
+
+    .anim-boundary-active .anim-text {
+      color: var(--accent-purple);
+      text-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+      animation: boundaryBurst 1s ease-out forwards;
+    }
+
+    .anim-boundary-active .anim-ball {
+      animation: ballPop 1s ease-out forwards;
+    }
+
+    @keyframes wicketFlash {
+      0% { opacity: 0; transform: scale(0.5); }
+      30% { opacity: 1; transform: scale(1.1); }
+      80% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.3); }
+    }
+
+    .anim-wicket-active {
+      background: rgba(225, 29, 72, 0.15);
+      border: 8px solid var(--accent-red);
+    }
+
+    .anim-wicket-active .anim-text {
+      color: var(--accent-red);
+      text-shadow: 0 0 30px rgba(225, 29, 72, 0.8);
+      animation: wicketFlash 1.1s ease-out forwards;
+    }
+
+    @keyframes textPulse {
+      0% { opacity: 0; transform: scale(0.5); }
+      50% { opacity: 1; transform: scale(1.1); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Dynamic Ball/Score Animation Container -->
+  <div id="animOverlay" class="anim-overlay hidden">
+    <div id="animBall" class="anim-ball"></div>
+    <div id="animText" class="anim-text">6 RUNS!</div>
+  </div>
+
+  <header class="app-header">
+    <h1>TACTICAL SCORER</h1>
+  </header>
+
+  <div class="container">
+    
+    <!-- Match Setup Glass Screen -->
+    <div class="glass-card" id="setupCard">
+      <h2 style="margin-bottom: 1.25rem; color: var(--accent-cyan);">System Setup</h2>
+      
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Team 1 Identifier</label>
+          <input type="text" id="team1Input" value="Team A">
+        </div>
+        <div class="form-group">
+          <label>Team 2 Identifier</label>
+          <input type="text" id="team2Input" value="Team B">
+        </div>
+        <div class="form-group">
+          <label>Squad Capacity</label>
+          <input type="number" id="squadSizeInput" value="5" min="2" max="15" onchange="handleSquadSizeChange()">
+        </div>
+        <div class="form-group">
+          <label>Max Wickets Threshold</label>
+          <input type="number" id="maxWicketsInput" value="4" min="1" max="14">
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Total Overs Limit</label>
+          <input type="number" id="maxOversInput" value="10" min="1" max="50">
+        </div>
+      </div>
+
+      <h3 style="margin: 1.5rem 0 1rem 0; color: var(--accent-cyan);">Roster Configuration</h3>
+      <div class="grid-2">
+        <div>
+          <h4 id="team1Label" style="color: var(--accent-lime); margin-bottom: 0.5rem;">Team A Roster</h4>
+          <div id="team1RosterInputs"></div>
+        </div>
+        <div>
+          <h4 id="team2Label" style="color: var(--accent-amber); margin-bottom: 0.5rem;">Team B Roster</h4>
+          <div id="team2RosterInputs"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-action" style="width: 100%; margin-top: 1.5rem; padding: 1rem;" onclick="startMatch()">Initialize Operation</button>
+    </div>
+
+    <!-- Live Glass Dashboard -->
+    <div id="scorerDashboard" class="hidden">
+      
+      <div class="glass-card scoreboard">
+        <div class="match-title" id="displayMatchTitle">Team A vs Team B</div>
+        <div class="badge" id="inningsBadge">1st Innings</div>
+        <div class="main-score"><span id="totalRuns">0</span> / <span id="totalWickets">0</span></div>
+        <div class="overs-display">Overs: <span id="completedOvers">0</span>.<span id="currentBalls">0</span> / <span id="maxOversDisplay">10</span></div>
+        <div class="target-display" id="targetDisplay"></div>
+        <div class="status-banner" id="matchStatusBanner"></div>
+      </div>
+
+      <div class="glass-card">
+        <label>Current Over Telemetry</label>
+        <div class="ball-log" id="overLog"></div>
+      </div>
+
+      <!-- Live Player Stats -->
+      <div class="glass-card">
+        <h3 style="color: var(--accent-cyan);">Batting Metrics</h3>
+        <table class="glass-table">
+          <thead>
+            <tr><th>Operator</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="active-striker" id="p1Name">Batter 1 *</td>
+              <td id="p1Runs">0</td><td id="p1Balls">0</td><td id="p1Fours">0</td><td id="p1Sixes">0</td><td id="p1SR">0.0</td>
+            </tr>
+            <tr>
+              <td id="p2Name">Batter 2</td>
+              <td id="p2Runs">0</td><td id="p2Balls">0</td><td id="p2Fours">0</td><td id="p2Sixes">0</td><td id="p2SR">0.0</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 style="margin-top: 1.5rem; color: var(--accent-cyan);">Bowling Metrics</h3>
+        <table class="glass-table">
+          <thead>
+            <tr><th>Operator</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td id="bowlerNameDisplay">Bowler 1</td>
+              <td id="bwlOvers">0.0</td><td id="bwlMaidens">0</td><td id="bwlRuns">0</td><td id="bwlWickets">0</td><td id="bwlEcon">0.0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Controls -->
+      <div class="glass-card">
+        <h3 style="margin-bottom: 1rem; color: var(--accent-cyan);">Command Interface</h3>
+        <div class="controls-grid">
+          <button class="btn btn-run ctrl-btn" onclick="addRun(0)">0</button>
+          <button class="btn btn-run ctrl-btn" onclick="addRun(1)">1</button>
+          <button class="btn btn-run ctrl-btn" onclick="addRun(2)">2</button>
+          <button class="btn btn-run ctrl-btn" onclick="addRun(3)">3</button>
+          <button class="btn btn-boundary ctrl-btn" onclick="addRun(4)">4</button>
+          <button class="btn btn-boundary ctrl-btn" onclick="addRun(6)">6</button>
+          <button class="btn btn-extra ctrl-btn" onclick="addWide()">WD</button>
+          <button class="btn btn-extra ctrl-btn" onclick="addNoBall()">NB</button>
+          <button class="btn btn-wicket ctrl-btn" onclick="addWicket()">WICKET</button>
+          <button class="btn btn-action ctrl-btn" onclick="swapStrike()">Swap Strike</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Glass Modal Overlay for Selections -->
+  <div class="modal-overlay hidden" id="selectionModal">
+    <div class="glass-card modal-card">
+      <h3 id="modalTitle" style="margin-bottom: 1rem; color: var(--accent-cyan);">Assign Operator</h3>
+      <div class="form-group">
+        <select id="modalSelect"></select>
+      </div>
+      <button class="btn btn-action" style="width: 100%; margin-top: 1rem;" onclick="confirmSelection()">Confirm Assignment</button>
+    </div>
+  </div>
+
+  <script>
+    let match = {
+      team1: "Team A", team2: "Team B", squadSize: 5, maxOvers: 10,
+      maxWickets: 4, innings: 1, target: 0, firstInningsRuns: 0,
+      runs: 0, wickets: 0, balls: 0, isFinished: false
+    };
+
+    let team1Roster = [];
+    let team2Roster = [];
+    let availableBatters = [];
+    let availableBowlers = [];
+
+    let striker = { name: "", runs: 0, balls: 0, fours: 0, sixes: 0 };
+    let nonStriker = { name: "", runs: 0, balls: 0, fours: 0, sixes: 0 };
+    let bowler = { name: "", balls: 0, runs: 0, wickets: 0 };
+
+    let modalCallback = null;
+
+    /* TRIGGER BALL / SCORE ANIMATIONS */
+    function triggerAnimation(type, text) {
+      const overlay = document.getElementById('animOverlay');
+      const textEl = document.getElementById('animText');
+      const ballEl = document.getElementById('animBall');
+
+      overlay.className = 'anim-overlay';
+      textEl.innerText = text;
+
+      void overlay.offsetWidth;
+
+      if (type === 'run') {
+        overlay.classList.add('anim-run-active');
+      } else if (type === 'boundary') {
+        overlay.classList.add('anim-boundary-active');
+      } else if (type === 'wicket') {
+        overlay.classList.add('anim-wicket-active');
+      }
+
+      overlay.classList.remove('hidden');
+
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        overlay.className = 'anim-overlay hidden';
+      }, 900);
+    }
+
+    function handleSquadSizeChange() {
+      const size = parseInt(document.getElementById('squadSizeInput').value) || 5;
+      document.getElementById('maxWicketsInput').value = size - 1;
+      generateRosterInputs(size);
+    }
+
+    function generateRosterInputs(size) {
+      size = size || parseInt(document.getElementById('squadSizeInput').value) || 5;
+      const t1Container = document.getElementById('team1RosterInputs');
+      const t2Container = document.getElementById('team2RosterInputs');
+      
+      t1Container.innerHTML = '';
+      t2Container.innerHTML = '';
+
+      for (let i = 1; i <= size; i++) {
+        t1Container.innerHTML += `<input type="text" class="t1-player" value="Player A${i}" style="margin-bottom:0.4rem;">`;
+        t2Container.innerHTML += `<input type="text" class="t2-player" value="Player B${i}" style="margin-bottom:0.4rem;">`;
+      }
+    }
+    generateRosterInputs(5);
+
+    function startMatch() {
+      match.team1 = document.getElementById('team1Input').value || "Team A";
+      match.team2 = document.getElementById('team2Input').value || "Team B";
+      match.squadSize = parseInt(document.getElementById('squadSizeInput').value) || 5;
+      match.maxWickets = parseInt(document.getElementById('maxWicketsInput').value) || (match.squadSize - 1);
+      match.maxOvers = parseInt(document.getElementById('maxOversInput').value) || 10;
+
+      team1Roster = Array.from(document.querySelectorAll('.t1-player')).map((el, i) => el.value || `Player A${i+1}`);
+      team2Roster = Array.from(document.querySelectorAll('.t2-player')).map((el, i) => el.value || `Player B${i+1}`);
+
+      document.getElementById('displayMatchTitle').innerText = `${match.team1} vs ${match.team2}`;
+      document.getElementById('maxOversDisplay').innerText = match.maxOvers;
+
+      document.getElementById('setupCard').classList.add('hidden');
+      document.getElementById('scorerDashboard').classList.remove('hidden');
+
+      setupInnings(1);
+    }
+
+    function setupInnings(inn) {
+      let batRoster = inn === 1 ? [...team1Roster] : [...team2Roster];
+      let bowlRoster = inn === 1 ? [...team2Roster] : [...team1Roster];
+
+      striker = { name: batRoster[0], runs: 0, balls: 0, fours: 0, sixes: 0 };
+      nonStriker = { name: batRoster[1], runs: 0, balls: 0, fours: 0, sixes: 0 };
+      bowler = { name: bowlRoster[0], balls: 0, runs: 0, wickets: 0 };
+
+      availableBatters = batRoster.slice(2);
+      availableBowlers = bowlRoster;
+
+      updateUI();
+    }
+
+    function openModal(title, options, callback) {
+      document.getElementById('modalTitle').innerText = title;
+      const select = document.getElementById('modalSelect');
+      select.innerHTML = '';
+      options.forEach(opt => {
+        select.innerHTML += `<option value="${opt}">${opt}</option>`;
+      });
+      modalCallback = callback;
+      document.getElementById('selectionModal').classList.remove('hidden');
+    }
+
+    function confirmSelection() {
+      const val = document.getElementById('modalSelect').value;
+      document.getElementById('selectionModal').classList.add('hidden');
+      if (modalCallback) modalCallback(val);
+    }
+
+    function addRun(runs) {
+      if (match.isFinished) return;
+
+      if (runs === 6) {
+        triggerAnimation('boundary', 'MAXIMUM! 6');
+      } else if (runs === 4) {
+        triggerAnimation('boundary', 'FOUR!');
+      } else if (runs > 0) {
+        triggerAnimation('run', `${runs} RUN${runs > 1 ? 'S' : ''}`);
+      } else {
+        triggerAnimation('run', 'DOT BALL');
+      }
+
+      match.runs += runs; match.balls++;
+      striker.runs += runs; striker.balls++;
+      if (runs === 4) striker.fours++;
+      if (runs === 6) striker.sixes++;
+      bowler.runs += runs; bowler.balls++;
+
+      logBall(runs);
+      if (runs % 2 !== 0) swapStrike();
+      checkMatchState();
+      updateUI();
+    }
+
+    function addWide() {
+      if (match.isFinished) return;
+      triggerAnimation('run', 'WIDE');
+      match.runs += 1; bowler.runs += 1;
+      logBall('WD');
+      checkMatchState();
+      updateUI();
+    }
+
+    function addNoBall() {
+      if (match.isFinished) return;
+      let extraRuns = parseInt(prompt("Enter runs scored off the bat/field for this No Ball:", "0")) || 0;
+      let total = 1 + extraRuns;
+
+      triggerAnimation('run', 'NO BALL');
+
+      match.runs += total;
+      striker.runs += extraRuns; striker.balls++;
+      if (extraRuns === 4) striker.fours++;
+      if (extraRuns === 6) striker.sixes++;
+      bowler.runs += total;
+
+      logBall(extraRuns > 0 ? `NB+${extraRuns}` : 'NB');
+      if (extraRuns % 2 !== 0) swapStrike();
+      checkMatchState();
+      updateUI();
+    }
+
+    function addWicket() {
+      if (match.isFinished) return;
+
+      triggerAnimation('wicket', 'OUT!');
+
+      match.wickets++; match.balls++; striker.balls++;
+      bowler.balls++; bowler.wickets++;
+      logBall('W');
+
+      if (match.wickets < match.maxWickets && availableBatters.length > 0) {
+        setTimeout(() => {
+          openModal("Select Next Batter", availableBatters, (selected) => {
+            availableBatters = availableBatters.filter(b => b !== selected);
+            striker = { name: selected, runs: 0, balls: 0, fours: 0, sixes: 0 };
+            checkMatchState();
+            updateUI();
+          });
+        }, 950);
+      } else {
+        checkMatchState();
+        updateUI();
+      }
+    }
+
+    function swapStrike() {
+      let temp = striker; striker = nonStriker; nonStriker = temp;
+      updateUI();
+    }
+
+    function checkMatchState() {
+      const maxBalls = match.maxOvers * 6;
+
+      if (match.innings === 2 && match.runs >= match.target) {
+        finishMatch(`${match.team2} VICTORY! Margin: ${match.maxWickets - match.wickets + 1} wickets.`);
+        return;
+      }
+
+      if (match.wickets >= match.maxWickets || match.balls >= maxBalls) {
+        if (match.innings === 1) {
+          startSecondInnings();
+        } else {
+          if (match.runs === match.target - 1) {
+            finishMatch("OPERATION TIED!");
+          } else {
+            finishMatch(`${match.team1} VICTORY! Margin: ${match.firstInningsRuns - match.runs} runs.`);
+          }
+        }
+        return;
+      }
+
+      if (match.balls > 0 && match.balls % 6 === 0) {
+        swapStrike();
+        setTimeout(() => {
+          openModal("Select Next Bowler", availableBowlers, (selected) => {
+            bowler = { name: selected, balls: 0, runs: 0, wickets: 0 };
+            document.getElementById('overLog').innerHTML = '';
+            updateUI();
+          });
+        }, 950);
+      }
+    }
+
+    function startSecondInnings() {
+      match.firstInningsRuns = match.runs;
+      match.target = match.runs + 1;
+      match.innings = 2; match.runs = 0; match.wickets = 0; match.balls = 0;
+
+      alert(`Phase 1 Complete! Target for ${match.team2}: ${match.target} runs.`);
+      document.getElementById('overLog').innerHTML = '';
+      setupInnings(2);
+    }
+
+    function finishMatch(msg) {
+      match.isFinished = true;
+      const banner = document.getElementById('matchStatusBanner');
+      banner.innerText = msg; banner.style.display = 'block';
+      document.querySelectorAll('.ctrl-btn').forEach(btn => btn.disabled = true);
+    }
+
+    function logBall(res) {
+      const log = document.getElementById('overLog');
+      const badge = document.createElement('div');
+      badge.className = `ball-badge ball-${res}`;
+      badge.innerText = res;
+      log.appendChild(badge);
+    }
+
+    function updateUI() {
+      document.getElementById('totalRuns').innerText = match.runs;
+      document.getElementById('totalWickets').innerText = match.wickets;
+      document.getElementById('completedOvers').innerText = Math.floor(match.balls / 6);
+      document.getElementById('currentBalls').innerText = match.balls % 6;
+
+      if (match.innings === 1) {
+        document.getElementById('inningsBadge').innerText = `1st Innings: ${match.team1} Active`;
+        document.getElementById('targetDisplay').innerText = `Max Wickets Threshold: ${match.maxWickets}`;
+      } else {
+        document.getElementById('inningsBadge').innerText = `2nd Innings: ${match.team2} Active`;
+        const needed = match.target - match.runs;
+        const remainingBalls = (match.maxOvers * 6) - match.balls;
+        const reqRate = remainingBalls > 0 ? ((needed / remainingBalls) * 6).toFixed(2) : "0.00";
+        document.getElementById('targetDisplay').innerText = `Target: ${match.target} | Need ${needed > 0 ? needed : 0} off ${remainingBalls} balls (RRR: ${reqRate})`;
+      }
+
+      document.getElementById('p1Name').innerText = `${striker.name} *`;
+      document.getElementById('p1Runs').innerText = striker.runs;
+      document.getElementById('p1Balls').innerText = striker.balls;
+      document.getElementById('p1Fours').innerText = striker.fours;
+      document.getElementById('p1Sixes').innerText = striker.sixes;
+      document.getElementById('p1SR').innerText = striker.balls ? ((striker.runs / striker.balls) * 100).toFixed(1) : "0.0";
+
+      document.getElementById('p2Name').innerText = nonStriker.name;
+      document.getElementById('p2Runs').innerText = nonStriker.runs;
+      document.getElementById('p2Balls').innerText = nonStriker.balls;
+      document.getElementById('p2Fours').innerText = nonStriker.fours;
+      document.getElementById('p2Sixes').innerText = nonStriker.sixes;
+      document.getElementById('p2SR').innerText = nonStriker.balls ? ((nonStriker.runs / nonStriker.balls) * 100).toFixed(1) : "0.0";
+
+      const bwlOversCalc = `${Math.floor(bowler.balls / 6)}.${bowler.balls % 6}`;
+      document.getElementById('bowlerNameDisplay').innerText = bowler.name;
+      document.getElementById('bwlOvers').innerText = bwlOversCalc;
+      document.getElementById('bwlRuns').innerText = bowler.runs;
+      document.getElementById('bwlWickets').innerText = bowler.wickets;
+      const bwlOversDecimal = bowler.balls / 6;
+      document.getElementById('bwlEcon').innerText = bwlOversDecimal ? (bowler.runs / bwlOversDecimal).toFixed(2) : "0.00";
+    }
+  </script>
+</body>
+</html>
